@@ -4,27 +4,27 @@ pragma solidity ^0.8.28;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-// 使用基础库中的 ReentrancyGuard，这是最稳妥的兼容写法
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract FluxPayProcessor is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    address public treasuryWallet; 
-    uint256 public feeRate;        
+    address public treasuryWallet;
+    uint256 public feeRate;
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
 
     event PaymentReceived(address indexed buyer, address indexed token, uint256 amount, uint256 fee);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(address _owner, address _treasury, uint256 _feeRate) public initializer {
         __UUPSUpgradeable_init();
         __Ownable_init(_owner);
-        // __ReentrancyGuard_init() 不再需要，ReentrancyGuard 会自动生效
         treasuryWallet = _treasury;
         feeRate = _feeRate;
     }
@@ -35,8 +35,12 @@ contract FluxPayProcessor is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         uint256 fee = (msg.value * feeRate) / BASIS_POINTS_DIVISOR;
         uint256 amountToCreator = msg.value - fee;
 
-        if (fee > 0) payable(treasuryWallet).transfer(fee);
-        if (amountToCreator > 0) payable(projectCreator).transfer(amountToCreator);
+        if (fee > 0) {
+            payable(treasuryWallet).transfer(fee);
+        }
+        if (amountToCreator > 0) {
+            payable(projectCreator).transfer(amountToCreator);
+        }
 
         emit PaymentReceived(msg.sender, address(0), msg.value, fee);
     }
@@ -48,8 +52,12 @@ contract FluxPayProcessor is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         uint256 fee = (amount * feeRate) / BASIS_POINTS_DIVISOR;
         uint256 amountToCreator = amount - fee;
 
-        if (fee > 0) tokenContract.safeTransfer(treasuryWallet, fee);
-        if (amountToCreator > 0) tokenContract.safeTransfer(projectCreator, amountToCreator);
+        if (fee > 0) {
+            tokenContract.safeTransfer(treasuryWallet, fee);
+        }
+        if (amountToCreator > 0) {
+            tokenContract.safeTransfer(projectCreator, amountToCreator);
+        }
 
         emit PaymentReceived(msg.sender, token, amount, fee);
     }
