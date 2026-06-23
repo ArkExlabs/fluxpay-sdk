@@ -91,11 +91,8 @@ pnpm-debug.log*
 
 /.agents
 /.claude
-
-# Keep AGENTS.md and CLAUDE.md trackable by default.
-# If you later decide they are private, add:
-# /AGENTS.md
-# /CLAUDE.md
+/AGENTS.md
+/CLAUDE.md
 
 # ==============================
 # OS files
