@@ -35,12 +35,16 @@ function runDeploymentScript() {
   };
 }
 
-describe("FluxPay v0.2.4 Deployment Script Dry Run + Proxy Address Sanity Pack", () => {
+describe("FluxPay v0.2.4/v0.2.5 Deployment Script Dry Run + Proxy Address Sanity Pack", () => {
   it("deploy-upgradeable.ts should dry-run successfully and return sane proxy state", () => {
     const { stdout, summary } = runDeploymentScript();
 
     expect(stdout).to.include("Deploying FluxPayProcessor UUPS proxy...");
     expect(stdout).to.include("Deployment sanity checks passed.");
+
+    expect(summary.networkName).to.be.a("string");
+    expect(summary.networkName.length).to.be.greaterThan(0);
+    expect(summary.chainId).to.match(/^[0-9]+$/);
 
     expect(summary.proxyAddress).to.match(/^0x[a-fA-F0-9]{40}$/);
     expect(summary.deployer).to.match(/^0x[a-fA-F0-9]{40}$/);

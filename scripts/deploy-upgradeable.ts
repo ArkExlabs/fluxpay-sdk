@@ -2,6 +2,8 @@ import hre from "hardhat";
 import { upgrades } from "@openzeppelin/hardhat-upgrades";
 
 type DeploymentSummary = {
+  networkName: string;
+  chainId: string;
   proxyAddress: string;
   deployer: string;
   owner: string;
@@ -30,12 +32,39 @@ function parseFeeRateBps(rawValue: string | undefined): number {
   return value;
 }
 
+function resolveRequestedNetworkName(): string {
+  const networkEqualArg = process.argv.find((arg) =>
+    arg.startsWith("--network=")
+  );
+
+  if (networkEqualArg) {
+    return networkEqualArg.split("=")[1] || "unknown";
+  }
+
+  const networkFlagIndex = process.argv.findIndex(
+    (arg) => arg === "--network" || arg === "-n"
+  );
+
+  if (
+    networkFlagIndex >= 0 &&
+    process.argv[networkFlagIndex + 1] !== undefined
+  ) {
+    return process.argv[networkFlagIndex + 1];
+  }
+
+  return process.env.HARDHAT_NETWORK ?? "default";
+}
+
 async function main() {
   const connection = await hre.network.create();
   const { ethers } = connection;
   const upgradesApi = await upgrades(hre, connection);
 
   const [deployer] = await ethers.getSigners();
+  const network = await ethers.provider.getNetwork();
+
+  const networkName = resolveRequestedNetworkName();
+  const chainId = network.chainId.toString();
 
   const treasury =
     process.env.FLUXPAY_TREASURY && process.env.FLUXPAY_TREASURY.trim().length > 0
@@ -49,6 +78,8 @@ async function main() {
   const feeRate = parseFeeRateBps(process.env.FLUXPAY_FEE_RATE_BPS);
 
   console.log("Deploying FluxPayProcessor UUPS proxy...");
+  console.log(`Network: ${networkName}`);
+  console.log(`Chain ID: ${chainId}`);
   console.log(`Deployer: ${deployer.address}`);
   console.log(`Initial owner: ${deployer.address}`);
   console.log(`Treasury: ${treasury}`);
@@ -115,6 +146,8 @@ async function main() {
   }
 
   const summary: DeploymentSummary = {
+    networkName,
+    chainId,
     proxyAddress,
     deployer: deployer.address,
     owner,

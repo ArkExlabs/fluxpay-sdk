@@ -66,16 +66,25 @@ pnpm-debug.log*
 # ==============================
 
 # Local / temporary OpenZeppelin deployment manifests
-/.openzeppelin/unknown-*.json
 /.openzeppelin/hardhat.json
 /.openzeppelin/localhost.json
 
-# Keep this directory available for future public network manifests if needed.
-# Example public network files can be committed later intentionally:
-# .openzeppelin/sepolia.json
-# .openzeppelin/base-sepolia.json
-# .openzeppelin/arbitrum-sepolia.json
-# .openzeppelin/mainnet.json
+# Unknown network manifests are ignored by default, except the explicit testnet
+# chain IDs currently used by FluxPay.
+# Base Sepolia: 84532
+# Arbitrum Sepolia: 421614
+/.openzeppelin/unknown-*.json
+!/.openzeppelin/unknown-84532.json
+!/.openzeppelin/unknown-421614.json
+
+# Named public network manifests can be committed intentionally.
+/.openzeppelin/*.json
+!/.openzeppelin/baseSepolia.json
+!/.openzeppelin/arbitrumSepolia.json
+!/.openzeppelin/sepolia.json
+!/.openzeppelin/mainnet.json
+!/.openzeppelin/unknown-84532.json
+!/.openzeppelin/unknown-421614.json
 
 # ==============================
 # Environment files
