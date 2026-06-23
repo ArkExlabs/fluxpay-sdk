@@ -4,11 +4,12 @@ pragma solidity ^0.8.28;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+// 使用基础库中的 ReentrancyGuard，这是最稳妥的兼容写法
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract FluxPayProcessor is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract FluxPayProcessor is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     address public treasuryWallet; 
@@ -23,7 +24,7 @@ contract FluxPayProcessor is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     function initialize(address _owner, address _treasury, uint256 _feeRate) public initializer {
         __UUPSUpgradeable_init();
         __Ownable_init(_owner);
-        __ReentrancyGuard_init();
+        // __ReentrancyGuard_init() 不再需要，ReentrancyGuard 会自动生效
         treasuryWallet = _treasury;
         feeRate = _feeRate;
     }
