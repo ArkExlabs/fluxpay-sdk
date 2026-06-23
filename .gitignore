@@ -87,6 +87,18 @@ pnpm-debug.log*
 !/.openzeppelin/unknown-421614.json
 
 # ==============================
+# Deployment registries
+# ==============================
+
+/deployments/*.local.json
+/deployments/*.private.json
+/deployments/*.tmp.json
+
+# Keep reviewed examples/templates trackable.
+!/deployments/*.example.json
+!/deployments/README.md
+
+# ==============================
 # Environment files
 # ==============================
 

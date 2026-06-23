@@ -1,0 +1,49 @@
+{
+  "project": "FluxPay",
+  "version": "0.2.6",
+  "description": "Example address registry for FluxPay testnet deployments. Copy this file to fluxpay-addresses.local.json or update a tracked network-specific registry after deployment review.",
+  "networks": {
+    "baseSepolia": {
+      "chainId": 84532,
+      "chainType": "op",
+      "rpcEnv": "BASE_SEPOLIA_RPC_URL",
+      "privateKeyEnv": "BASE_SEPOLIA_PRIVATE_KEY",
+      "proxyAddress": "",
+      "implementationAddress": "",
+      "owner": "",
+      "treasury": "",
+      "feeRateBps": 250,
+      "productionLocked": true,
+      "paused": false,
+      "deploymentTxHash": "",
+      "deploymentBlockNumber": null,
+      "deployedAtUtc": "",
+      "explorerBaseUrl": "https://sepolia.basescan.org",
+      "proxyExplorerUrl": "",
+      "manifestFile": ".openzeppelin/unknown-84532.json",
+      "verifyCommand": "npx hardhat run scripts/verify-deployment.ts --network baseSepolia",
+      "status": "not_deployed"
+    },
+    "arbitrumSepolia": {
+      "chainId": 421614,
+      "chainType": "generic",
+      "rpcEnv": "ARBITRUM_SEPOLIA_RPC_URL",
+      "privateKeyEnv": "ARBITRUM_SEPOLIA_PRIVATE_KEY",
+      "proxyAddress": "",
+      "implementationAddress": "",
+      "owner": "",
+      "treasury": "",
+      "feeRateBps": 250,
+      "productionLocked": true,
+      "paused": false,
+      "deploymentTxHash": "",
+      "deploymentBlockNumber": null,
+      "deployedAtUtc": "",
+      "explorerBaseUrl": "https://sepolia.arbiscan.io",
+      "proxyExplorerUrl": "",
+      "manifestFile": ".openzeppelin/unknown-421614.json",
+      "verifyCommand": "npx hardhat run scripts/verify-deployment.ts --network arbitrumSepolia",
+      "status": "not_deployed"
+    }
+  }
+}
