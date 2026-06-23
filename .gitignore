@@ -1,0 +1,131 @@
+# ==============================
+# FluxPay / Hardhat / TypeScript
+# ==============================
+
+# Node modules
+/node_modules
+
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Package manager caches
+.npm/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnpm-store/
+
+# ==============================
+# Build outputs
+# ==============================
+
+# SDK / TypeScript build output
+/dist
+/build
+/lib
+
+# pnpm deploy output
+/bundle
+
+# TypeChain output
+/types
+
+# ==============================
+# Hardhat outputs
+# ==============================
+
+# Hardhat build artifacts
+/artifacts
+
+# Hardhat compilation cache
+/cache
+
+# Hardhat coverage reports
+/coverage
+/coverage.json
+
+# Gas snapshot files
+/.gas-snapshot
+
+# Snapshot cheatcodes output
+/snapshots
+
+# ==============================
+# Hardhat Ignition outputs
+# ==============================
+
+# Local Ignition deployment records
+/ignition/deployments/
+
+# ==============================
+# OpenZeppelin Upgrades
+# ==============================
+
+# Local / temporary OpenZeppelin deployment manifests
+/.openzeppelin/unknown-*.json
+/.openzeppelin/hardhat.json
+/.openzeppelin/localhost.json
+
+# Keep this directory available for future public network manifests if needed.
+# Example public network files can be committed later intentionally:
+# .openzeppelin/sepolia.json
+# .openzeppelin/base-sepolia.json
+# .openzeppelin/arbitrum-sepolia.json
+# .openzeppelin/mainnet.json
+
+# ==============================
+# Environment files
+# ==============================
+
+.env
+.env.*
+!.env.example
+
+# ==============================
+# Local AI / agent workflow files
+# ==============================
+
+/.agents
+/.claude
+
+# Keep AGENTS.md and CLAUDE.md trackable by default.
+# If you later decide they are private, add:
+# /AGENTS.md
+# /CLAUDE.md
+
+# ==============================
+# OS files
+# ==============================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==============================
+# Editor / IDE local files
+# ==============================
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+.idea/
+
+# ==============================
+# Test / temporary files
+# ==============================
+
+*.tmp
+*.temp
+*.log
+
+# ==============================
+# Solidity / analysis tool outputs
+# ==============================
+
+slither.db.json
+crytic-export/
+mythril-output/
