@@ -77,6 +77,21 @@ export type FluxPayParsedReceipt = {
   productionLocked: FluxPayDecodedProductionLocked[];
 };
 
+export type FluxPayNormalizedTransaction = {
+  transactionHash: string | null;
+  blockNumber: number | null;
+  receipt: FluxPayPaymentReceipt;
+  parsed: FluxPayParsedReceipt;
+};
+
+export type FluxPayPaymentResult = FluxPayNormalizedTransaction & {
+  payment: FluxPayDecodedPaymentReceived;
+};
+
+export type FluxPayConfigUpdateResult = FluxPayNormalizedTransaction & {
+  config: FluxPayDecodedConfigUpdated;
+};
+
 type LogLike = {
   topics?: readonly string[];
   data?: string;
@@ -175,6 +190,16 @@ export class FluxPay {
   }
 
   /**
+   * Native payment helper that returns a normalized payment result.
+   */
+  async payNativeAndParse(
+    request: NativePaymentRequest
+  ): Promise<FluxPayPaymentResult> {
+    const receipt = await this.payNative(request);
+    return this.buildPaymentResult(receipt);
+  }
+
+  /**
    * Backward-compatible native payment method.
    */
   async payWithETH(
@@ -214,6 +239,16 @@ export class FluxPay {
   }
 
   /**
+   * ERC-20 payment helper that returns a normalized payment result.
+   */
+  async payTokenAndParse(
+    request: TokenPaymentRequest
+  ): Promise<FluxPayPaymentResult> {
+    const receipt = await this.payToken(request);
+    return this.buildPaymentResult(receipt);
+  }
+
+  /**
    * Backward-compatible ERC-20 payment method.
    */
   async payWithToken(
@@ -243,6 +278,16 @@ export class FluxPay {
     );
 
     return await tx.wait();
+  }
+
+  /**
+   * Admin config update helper that returns a normalized config update result.
+   */
+  async setConfigAndParse(
+    request: UpdateConfigRequest
+  ): Promise<FluxPayConfigUpdateResult> {
+    const receipt = await this.setConfig(request);
+    return this.buildConfigUpdateResult(receipt);
   }
 
   /**
@@ -387,6 +432,62 @@ export class FluxPay {
     logs: readonly LogLike[]
   ): FluxPayDecodedProductionLocked[] {
     return this.parseLogs(logs).productionLocked;
+  }
+
+  /**
+   * Normalize any receipt into parsed transaction metadata.
+   */
+  normalizeReceipt(
+    receipt: ContractTransactionReceipt | null
+  ): FluxPayNormalizedTransaction {
+    const parsed = this.parseReceipt(receipt);
+
+    return {
+      transactionHash: parsed.transactionHash,
+      blockNumber: parsed.blockNumber,
+      receipt,
+      parsed,
+    };
+  }
+
+  /**
+   * Build a normalized payment result from a payment receipt.
+   */
+  buildPaymentResult(
+    receipt: ContractTransactionReceipt | null
+  ): FluxPayPaymentResult {
+    const normalized = this.normalizeReceipt(receipt);
+
+    if (normalized.parsed.paymentReceived.length !== 1) {
+      throw new Error(
+        `Expected exactly one PaymentReceived event, found ${normalized.parsed.paymentReceived.length}`
+      );
+    }
+
+    return {
+      ...normalized,
+      payment: normalized.parsed.paymentReceived[0],
+    };
+  }
+
+  /**
+   * Build a normalized config update result from an admin update receipt.
+   */
+  buildConfigUpdateResult(
+    receipt: ContractTransactionReceipt | null
+  ): FluxPayConfigUpdateResult {
+    const normalized = this.normalizeReceipt(receipt);
+
+    if (normalized.parsed.configUpdated.length !== 1) {
+      throw new Error(
+        `Expected exactly one ConfigUpdated event, found ${normalized.parsed.configUpdated.length}`
+      );
+    }
+
+    return {
+      ...normalized,
+      config: normalized.parsed.configUpdated[0],
+    };
   }
 
   private tryDecodeKnownEvent(log: LogLike): FluxPayDecodedEvent | null {
