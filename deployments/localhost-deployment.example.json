@@ -1,0 +1,26 @@
+{
+  "project": "FluxPay",
+  "version": "0.2.7",
+  "network": "localhost",
+  "chainId": 31337,
+  "chainType": "l1",
+  "rpcUrl": "http://127.0.0.1:8545",
+  "proxyAddress": "",
+  "implementationAddress": "",
+  "deployer": "",
+  "owner": "",
+  "treasury": "",
+  "feeRateBps": 250,
+  "productionLocked": true,
+  "paused": false,
+  "deploymentTxHash": "",
+  "deploymentBlockNumber": null,
+  "deployedAtUtc": "",
+  "verifyCommand": "npx hardhat run scripts/verify-deployment.ts --network localhost",
+  "status": "not_deployed",
+  "notes": [
+    "This is a persistent local Hardhat node deployment record template.",
+    "Do not treat this as a public testnet or mainnet deployment.",
+    "Use this only for local deployment workflow validation."
+  ]
+}
