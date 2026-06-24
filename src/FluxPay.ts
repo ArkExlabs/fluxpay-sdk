@@ -4,6 +4,7 @@ import {
   type ContractTransactionReceipt,
   type ContractTransactionResponse,
   type InterfaceAbi,
+  type LogDescription,
   type Signer,
 } from "ethers";
 
@@ -32,6 +33,57 @@ export type UpdateConfigRequest = {
 };
 
 export type FluxPayPaymentReceipt = ContractTransactionReceipt | null;
+
+export type FluxPayParsedEventName =
+  | "PaymentReceived"
+  | "ConfigUpdated"
+  | "ProductionLocked";
+
+export type FluxPayDecodedPaymentReceived = {
+  name: "PaymentReceived";
+  buyer: string;
+  token: string;
+  amount: bigint;
+  fee: bigint;
+  logIndex: number | null;
+  transactionHash: string | null;
+};
+
+export type FluxPayDecodedConfigUpdated = {
+  name: "ConfigUpdated";
+  treasuryWallet: string;
+  feeRate: bigint;
+  logIndex: number | null;
+  transactionHash: string | null;
+};
+
+export type FluxPayDecodedProductionLocked = {
+  name: "ProductionLocked";
+  logIndex: number | null;
+  transactionHash: string | null;
+};
+
+export type FluxPayDecodedEvent =
+  | FluxPayDecodedPaymentReceived
+  | FluxPayDecodedConfigUpdated
+  | FluxPayDecodedProductionLocked;
+
+export type FluxPayParsedReceipt = {
+  transactionHash: string | null;
+  blockNumber: number | null;
+  events: FluxPayDecodedEvent[];
+  paymentReceived: FluxPayDecodedPaymentReceived[];
+  configUpdated: FluxPayDecodedConfigUpdated[];
+  productionLocked: FluxPayDecodedProductionLocked[];
+};
+
+type LogLike = {
+  topics?: readonly string[];
+  data?: string;
+  index?: number;
+  logIndex?: number;
+  transactionHash?: string;
+};
 
 export class FluxPay {
   private readonly contract: Contract;
@@ -244,6 +296,155 @@ export class FluxPay {
     return await this.contract.MAX_FEE_RATE();
   }
 
+  /**
+   * Parse a transaction receipt and decode FluxPay-specific events.
+   */
+  parseReceipt(receipt: ContractTransactionReceipt | null): FluxPayParsedReceipt {
+    if (receipt === null) {
+      return {
+        transactionHash: null,
+        blockNumber: null,
+        events: [],
+        paymentReceived: [],
+        configUpdated: [],
+        productionLocked: [],
+      };
+    }
+
+    return this.parseLogs(receipt.logs as LogLike[], {
+      transactionHash: receipt.hash ?? null,
+      blockNumber: receipt.blockNumber ?? null,
+    });
+  }
+
+  /**
+   * Parse raw logs or EventLog-like objects and decode FluxPay-specific events.
+   */
+  parseLogs(
+    logs: readonly LogLike[],
+    context?: {
+      transactionHash?: string | null;
+      blockNumber?: number | null;
+    }
+  ): FluxPayParsedReceipt {
+    const events: FluxPayDecodedEvent[] = [];
+
+    for (const log of logs) {
+      const decoded = this.tryDecodeKnownEvent(log);
+
+      if (decoded !== null) {
+        events.push(decoded);
+      }
+    }
+
+    const paymentReceived = events.filter(
+      (event): event is FluxPayDecodedPaymentReceived =>
+        event.name === "PaymentReceived"
+    );
+
+    const configUpdated = events.filter(
+      (event): event is FluxPayDecodedConfigUpdated =>
+        event.name === "ConfigUpdated"
+    );
+
+    const productionLocked = events.filter(
+      (event): event is FluxPayDecodedProductionLocked =>
+        event.name === "ProductionLocked"
+    );
+
+    return {
+      transactionHash: context?.transactionHash ?? null,
+      blockNumber: context?.blockNumber ?? null,
+      events,
+      paymentReceived,
+      configUpdated,
+      productionLocked,
+    };
+  }
+
+  /**
+   * Convenience method for extracting PaymentReceived events from a receipt.
+   */
+  parsePaymentReceived(
+    receipt: ContractTransactionReceipt | null
+  ): FluxPayDecodedPaymentReceived[] {
+    return this.parseReceipt(receipt).paymentReceived;
+  }
+
+  /**
+   * Convenience method for extracting ConfigUpdated events from a receipt.
+   */
+  parseConfigUpdated(
+    receipt: ContractTransactionReceipt | null
+  ): FluxPayDecodedConfigUpdated[] {
+    return this.parseReceipt(receipt).configUpdated;
+  }
+
+  /**
+   * Convenience method for extracting ProductionLocked events from raw logs.
+   */
+  parseProductionLockedLogs(
+    logs: readonly LogLike[]
+  ): FluxPayDecodedProductionLocked[] {
+    return this.parseLogs(logs).productionLocked;
+  }
+
+  private tryDecodeKnownEvent(log: LogLike): FluxPayDecodedEvent | null {
+    if (!log.topics || !log.data) {
+      return null;
+    }
+
+    let parsed: LogDescription | null = null;
+
+    try {
+      parsed = this.contract.interface.parseLog({
+        topics: [...log.topics],
+        data: log.data,
+      });
+    } catch {
+      return null;
+    }
+
+    if (parsed === null) {
+      return null;
+    }
+
+    const logIndex = FluxPay.resolveLogIndex(log);
+    const transactionHash = log.transactionHash ?? null;
+
+    if (parsed.name === "PaymentReceived") {
+      return {
+        name: "PaymentReceived",
+        buyer: parsed.args.buyer,
+        token: parsed.args.token,
+        amount: parsed.args.amount,
+        fee: parsed.args.fee,
+        logIndex,
+        transactionHash,
+      };
+    }
+
+    if (parsed.name === "ConfigUpdated") {
+      return {
+        name: "ConfigUpdated",
+        treasuryWallet: parsed.args.treasuryWallet,
+        feeRate: parsed.args.feeRate,
+        logIndex,
+        transactionHash,
+      };
+    }
+
+    if (parsed.name === "ProductionLocked") {
+      return {
+        name: "ProductionLocked",
+        logIndex,
+        transactionHash,
+      };
+    }
+
+    return null;
+  }
+
   static toBigIntAmount(value: FluxPayAmount, fieldName = "amount"): bigint {
     if (typeof value === "bigint") {
       return value;
@@ -308,5 +509,17 @@ export class FluxPay {
     if (value > 1000) {
       throw new Error("feeRate cannot exceed 1000 bps");
     }
+  }
+
+  private static resolveLogIndex(log: LogLike): number | null {
+    if (typeof log.index === "number") {
+      return log.index;
+    }
+
+    if (typeof log.logIndex === "number") {
+      return log.logIndex;
+    }
+
+    return null;
   }
 }
