@@ -1,102 +1,312 @@
-import { ethers, Contract, type Signer } from "ethers";
+import {
+  ethers,
+  Contract,
+  type ContractTransactionReceipt,
+  type ContractTransactionResponse,
+  type InterfaceAbi,
+  type Signer,
+} from "ethers";
+
+export type FluxPayAmount = bigint | string | number;
+
+export type FluxPayClientConfig = {
+  contractAddress: string;
+  abi: InterfaceAbi;
+  signer: Signer;
+};
+
+export type NativePaymentRequest = {
+  projectCreator: string;
+  amount: FluxPayAmount;
+};
+
+export type TokenPaymentRequest = {
+  token: string;
+  amount: FluxPayAmount;
+  projectCreator: string;
+};
+
+export type UpdateConfigRequest = {
+  treasury: string;
+  feeRate: number;
+};
+
+export type FluxPayPaymentReceipt = ContractTransactionReceipt | null;
 
 export class FluxPay {
-  private contract: Contract;
-  private signer: Signer;
+  private readonly contract: Contract;
+  private readonly signer: Signer;
+  private readonly contractAddress: string;
 
   /**
-   * @param contractAddress - The deployed contract or proxy address
-   * @param abi - The contract ABI from artifacts
-   * @param signer - The ethers Signer instance
+   * Backward-compatible constructor.
+   *
+   * @param contractAddress - The deployed proxy address.
+   * @param abi - The FluxPayProcessor ABI.
+   * @param signer - The ethers Signer instance.
    */
-  constructor(contractAddress: string, abi: any, signer: Signer) {
+  constructor(contractAddress: string, abi: InterfaceAbi, signer: Signer) {
+    FluxPay.assertAddress(contractAddress, "contractAddress");
+
+    this.contractAddress = contractAddress;
     this.contract = new Contract(contractAddress, abi, signer);
     this.signer = signer;
   }
 
-  getContract() {
+  /**
+   * Preferred typed constructor for SDK consumers.
+   */
+  static connect(config: FluxPayClientConfig): FluxPay {
+    return new FluxPay(config.contractAddress, config.abi, config.signer);
+  }
+
+  getContract(): Contract {
     return this.contract;
   }
 
-  getSigner() {
+  getSigner(): Signer {
     return this.signer;
   }
 
-  // Initialize the contract. For proxy deployments, this is normally called
-  // by deployProxy and should not be called manually again.
-  async initialize(owner: string, treasury: string, feeRate: number) {
-    try {
-      const currentOwner = await this.contract.owner();
-
-      if (currentOwner !== ethers.ZeroAddress) {
-        throw new Error("Contract already initialized");
-      }
-
-      const tx = await this.contract.initialize(owner, treasury, feeRate);
-      return await tx.wait();
-    } catch (error) {
-      console.error("Initialization failed:", error);
-      throw error;
-    }
+  getContractAddress(): string {
+    return this.contractAddress;
   }
 
-  // Pay with native ETH.
-  async payWithETH(projectCreator: string, amount: string | bigint) {
-    const value = ethers.toBigInt(amount);
-    const tx = await this.contract.payWithETH(projectCreator, { value });
+  /**
+   * Initialize the contract.
+   *
+   * For UUPS proxy deployments, initialize is normally called by deployProxy.
+   * SDK users should not call this on an already-initialized proxy.
+   */
+  async initialize(
+    owner: string,
+    treasury: string,
+    feeRate: number
+  ): Promise<FluxPayPaymentReceipt> {
+    FluxPay.assertAddress(owner, "owner");
+    FluxPay.assertAddress(treasury, "treasury");
+    FluxPay.assertFeeRate(feeRate);
+
+    const currentOwner = await this.contract.owner();
+
+    if (currentOwner !== ethers.ZeroAddress) {
+      throw new Error("Contract already initialized");
+    }
+
+    const tx = await this.contract.initialize(owner, treasury, feeRate);
     return await tx.wait();
   }
 
-  // Pay with ERC20 tokens.
+  /**
+   * Preferred typed native-token payment method.
+   *
+   * On ETH-like networks this sends ETH.
+   * On other EVM networks this sends the native gas token.
+   */
+  async payNative(
+    request: NativePaymentRequest
+  ): Promise<FluxPayPaymentReceipt> {
+    FluxPay.assertAddress(request.projectCreator, "projectCreator");
+
+    const value = FluxPay.toBigIntAmount(request.amount, "amount");
+
+    if (value <= 0n) {
+      throw new Error("amount must be greater than zero");
+    }
+
+    const tx: ContractTransactionResponse = await this.contract.payWithETH(
+      request.projectCreator,
+      { value }
+    );
+
+    return await tx.wait();
+  }
+
+  /**
+   * Backward-compatible native payment method.
+   */
+  async payWithETH(
+    projectCreator: string,
+    amount: FluxPayAmount
+  ): Promise<FluxPayPaymentReceipt> {
+    return await this.payNative({
+      projectCreator,
+      amount,
+    });
+  }
+
+  /**
+   * Preferred typed ERC-20 payment method.
+   *
+   * The caller must approve the FluxPay proxy before calling this method.
+   */
+  async payToken(
+    request: TokenPaymentRequest
+  ): Promise<FluxPayPaymentReceipt> {
+    FluxPay.assertAddress(request.token, "token");
+    FluxPay.assertAddress(request.projectCreator, "projectCreator");
+
+    const amount = FluxPay.toBigIntAmount(request.amount, "amount");
+
+    if (amount <= 0n) {
+      throw new Error("amount must be greater than zero");
+    }
+
+    const tx: ContractTransactionResponse = await this.contract.payWithToken(
+      request.token,
+      amount,
+      request.projectCreator
+    );
+
+    return await tx.wait();
+  }
+
+  /**
+   * Backward-compatible ERC-20 payment method.
+   */
   async payWithToken(
     token: string,
-    amount: string | bigint,
+    amount: FluxPayAmount,
     projectCreator: string
-  ) {
-    const amountBigInt = ethers.toBigInt(amount);
-    const tx = await this.contract.payWithToken(
+  ): Promise<FluxPayPaymentReceipt> {
+    return await this.payToken({
       token,
-      amountBigInt,
-      projectCreator
+      amount,
+      projectCreator,
+    });
+  }
+
+  /**
+   * Preferred typed admin config update method.
+   */
+  async setConfig(
+    request: UpdateConfigRequest
+  ): Promise<FluxPayPaymentReceipt> {
+    FluxPay.assertAddress(request.treasury, "treasury");
+    FluxPay.assertFeeRate(request.feeRate);
+
+    const tx: ContractTransactionResponse = await this.contract.updateConfig(
+      request.treasury,
+      request.feeRate
     );
+
     return await tx.wait();
   }
 
-  // Update treasury and fee configuration.
-  async updateConfig(treasury: string, feeRate: number) {
-    const tx = await this.contract.updateConfig(treasury, feeRate);
+  /**
+   * Backward-compatible admin config update method.
+   */
+  async updateConfig(
+    treasury: string,
+    feeRate: number
+  ): Promise<FluxPayPaymentReceipt> {
+    return await this.setConfig({
+      treasury,
+      feeRate,
+    });
+  }
+
+  async pause(): Promise<FluxPayPaymentReceipt> {
+    const tx: ContractTransactionResponse = await this.contract.pause();
     return await tx.wait();
   }
 
-  // Emergency pause. Owner only.
-  async pause() {
-    const tx = await this.contract.pause();
+  async unpause(): Promise<FluxPayPaymentReceipt> {
+    const tx: ContractTransactionResponse = await this.contract.unpause();
     return await tx.wait();
   }
 
-  // Emergency unpause. Owner only.
-  async unpause() {
-    const tx = await this.contract.unpause();
-    return await tx.wait();
-  }
-
-  async owner() {
+  async owner(): Promise<string> {
     return await this.contract.owner();
   }
 
-  async treasuryWallet() {
+  async treasuryWallet(): Promise<string> {
     return await this.contract.treasuryWallet();
   }
 
-  async feeRate() {
+  async feeRate(): Promise<bigint> {
     return await this.contract.feeRate();
   }
 
-  async productionLocked() {
+  async productionLocked(): Promise<boolean> {
     return await this.contract.productionLocked();
   }
 
-  async paused() {
+  async paused(): Promise<boolean> {
     return await this.contract.paused();
+  }
+
+  async basisPointsDivisor(): Promise<bigint> {
+    return await this.contract.BASIS_POINTS_DIVISOR();
+  }
+
+  async maxFeeRate(): Promise<bigint> {
+    return await this.contract.MAX_FEE_RATE();
+  }
+
+  static toBigIntAmount(value: FluxPayAmount, fieldName = "amount"): bigint {
+    if (typeof value === "bigint") {
+      return value;
+    }
+
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) {
+        throw new Error(`${fieldName} must be finite`);
+      }
+
+      if (!Number.isInteger(value)) {
+        throw new Error(`${fieldName} number input must be an integer`);
+      }
+
+      if (!Number.isSafeInteger(value)) {
+        throw new Error(
+          `${fieldName} number input must be a safe integer; use bigint or string instead`
+        );
+      }
+
+      return BigInt(value);
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+
+      if (trimmed.length === 0) {
+        throw new Error(`${fieldName} string input cannot be empty`);
+      }
+
+      if (!/^[0-9]+$/.test(trimmed)) {
+        throw new Error(
+          `${fieldName} string input must be an integer base-unit amount`
+        );
+      }
+
+      return BigInt(trimmed);
+    }
+
+    throw new Error(`${fieldName} has unsupported amount type`);
+  }
+
+  static assertAddress(value: string, fieldName: string): void {
+    if (!ethers.isAddress(value)) {
+      throw new Error(`${fieldName} must be a valid EVM address`);
+    }
+
+    if (value === ethers.ZeroAddress) {
+      throw new Error(`${fieldName} cannot be the zero address`);
+    }
+  }
+
+  static assertFeeRate(value: number): void {
+    if (!Number.isInteger(value)) {
+      throw new Error("feeRate must be an integer");
+    }
+
+    if (value < 0) {
+      throw new Error("feeRate cannot be negative");
+    }
+
+    if (value > 1000) {
+      throw new Error("feeRate cannot exceed 1000 bps");
+    }
   }
 }
